@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "icon": "bicycle-outline",
+    "label": "Deliveries",
+    "path": "DeliveryHistory"
+  },
+  {
+    "id": "2",
+    "icon": "person-outline",
+    "label": "Edit Personal Info",
+    "path": "EditPersonalInfo"
+  },
+  {
+    "id": "3",
+    "icon": "lock-closed-outline",
+    "label": "Change Password",
+    "path": "ChangePassword"
+  }
+]
