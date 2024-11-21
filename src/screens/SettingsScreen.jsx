@@ -1,20 +1,28 @@
 import { useDispatch, useSelector } from "react-redux";
 import { Popup } from "react-native-popup-confirm-toast";
+
+import { useState, useEffect } from "react";
 import { Colors } from "../constants/color";
 import { updateUserInfo } from "../features/authSlice";
-import { ref, getDownloadURL, uploadBytes } from "firebase/storage";
+import { ref as storageRef, getDownloadURL, uploadBytes } from "firebase/storage";
 import { storage } from "../config/firebaseConfig";
 import { View, Text, Image, StyleSheet, Pressable } from "react-native";
 import AccountSettingList from "../components/ui/AccountSettingList";
 import DefaultPic from "../assets/default-profile.jpg";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import LoadingScreen from "./LoadingScreen";
+import { editInfo } from "../api/authApi";
 import ErrorText from "../components/ui/ErrorText";
 import * as ImagePicker from "expo-image-picker";
+import * as SecureStore from "expo-secure-store";
+import axios from "axios";
 
 export default function SettingsScreen({ navigation }) {
   const dispatch = useDispatch();
   const { user, loading, error } = useSelector((state) => state.auth);
+
+  const [image, setImage] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const pickImage = async () => {
     let permissionResult =
@@ -35,13 +43,12 @@ export default function SettingsScreen({ navigation }) {
       return;
     }
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
       quality: 1,
     });
 
-    if (!result.cancelled && result.assets && result.assets.length > 0) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       const selectedImage = result.assets[0];
       const imageUri = selectedImage.uri;
 
@@ -56,21 +63,70 @@ export default function SettingsScreen({ navigation }) {
         descTextStyle: { fontFamily: "Poppins_400Regular", textAlign: "left" },
         okButtonStyle: { backgroundColor: Colors.primaryColor },
         callback: async () => {
+          
+          setUploading(true)
+          console.log("Eyos")
           const response = await fetch(imageUri);
+          console.log(response)
           const blob = await response.blob();
-          const storageRef = ref(storage, `user/${user.uid}/profilePic`);
+          console.log(blob)
+          console.log("test")
 
-          const snapshot = await uploadBytes(storageRef, blob);
+          const imageRef = storageRef(storage, "rider/profilePic");
+          console.log("test2")
+          
+          console.log("ImageRef", imageRef)
+          const snapshot = uploadBytes(imageRef, blob);
+          console.log("Snapshot", snapshot)
+          snapshot
+                .then(() => {
+                  setUploading(false);
+                })
+                .catch((error) => {
+                  setUploading(false);
+                  console.log(error);
+                  return;
+                });
 
-          const url = await getDownloadURL(snapshot.ref);
+                snapshot.then(async () => {
+                  const url = await getDownloadURL(imageRef);
+                  const userId = await SecureStore.getItemAsync("userId");
+                  const token = await SecureStore.getItemAsync("token");
+                  
+                  console.log(url)
+                  console.log("put")
+                  await axios.put(
+                    `https://go-shopping-api-mauve.vercel.app/api/riders/${userId}`,
+                    {
+                      profilePic: url,
+                    },
+                    {
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                      },
+                    }
+                  );
+  
+                  console.log("updateuser")
+                  await editInfo({
+                    profilePic: url,
+                  });
+  
+                  console.log("setImage")
+                  setImage(url);
+                });
 
-          await dispatch(updateUserInfo({ profilePic: url }));
+          // const url = await getDownloadURL(snapshot.ref);
+
+          // await dispatch(updateUserInfo({ profilePic: url }));
+
+
 
           Popup.hide();
         },
         cancelCallback: () => {
           Popup.hide();
-        },
+          },
       });
     }
   };
@@ -83,7 +139,12 @@ export default function SettingsScreen({ navigation }) {
       <View style={styles.profilePicContainer}>
         <Image
           style={styles.profilePic}
-          source={user?.profilePic ? { uri: user.profilePic } : DefaultPic}
+          source={{
+            uri:
+              image ||
+              (user && user.profilePic) ||
+              "https://i.stack.imgur.com/l60Hf.png",
+          }}
         />
         <Pressable style={styles.editBtn} onPress={pickImage}>
           <Ionicons name="pencil" color={Colors.secondaryColor} size={25} />
@@ -93,6 +154,9 @@ export default function SettingsScreen({ navigation }) {
         {`${user?.firstName} ${user?.lastName}` || "User"}
       </Text>
       <Text style={styles.email}>{user?.email || ""}</Text>
+      <Text style={styles.phoneNumber}>+63{user?.phoneNumber.startsWith('0')
+          ? user?.phoneNumber.slice(1)
+          : user?.phoneNumber}</Text>
       <AccountSettingList navigation={navigation} />
     </View>
   );
@@ -136,12 +200,18 @@ const styles = StyleSheet.create({
   },
   username: {
     fontSize: 20,
-    color: Colors.textColor,
-    fontFamily: "Poppins_500Medium",
-    marginBottom: 6,
+    color: Colors.dark,
+    fontFamily: "Poppins_600SemiBold",
+    marginBottom: 4,
   },
   email: {
     fontSize: 18,
+    color: Colors.textColor,
+    fontFamily: "Poppins_500Medium",
+    marginBottom: 4,
+  },
+  phoneNumber: {
+    fontSize: 16,
     color: Colors.textColor,
     fontFamily: "Poppins_500Medium",
     marginBottom: 40,

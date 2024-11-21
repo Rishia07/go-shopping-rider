@@ -9,6 +9,12 @@ export const fetchOrders = async () => {
   return data;
 };
 
+export const getTodaysOrderCountForRider = async () => {
+  const userId = await getUserIdFromSecureStore();
+  const { data } = await axios.get(`${fetchOrdersURL}/${userId}/orders/today`);
+  return data;
+};
+
 
 export const createOrder = async (newOrder) => {
   const { data } = await axios.post(fetchOrdersURL, newOrder);
